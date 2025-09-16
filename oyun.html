@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emoji Oyunu</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #f0f0f0;}
+  #gameCanvas { background: #fff; display: block; margin: 0 auto; border: 2px solid #000;}
+  #leaderboard { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.8); padding: 10px; border-radius: 5px; }
+  #leaderboard h3 { margin: 0 0 10px 0; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<div id="leaderboard">
+  <h3>Liderlik Tablosu</h3>
+  <ol id="scoresList"></ol>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Oyuncu ismini sor
+let playerName = prompt("İsminiz nedir?") || "Oyuncu";
+
+// Aynı isim varsa sonuna otomatik numara ekle
+let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+let originalName = playerName;
+let counter = 1;
+while(leaderboard.some(p => p.name === playerName)){
+    playerName = originalName + "_" + counter;
+    counter++;
+}
+
+let score = 0;
+
+// Emojiler
+const emojis = ["🥱","💎","😎","😺","🌟","🍀"];
+let emojiObjects = [];
+
+const maxEmojis = 5;
+const emojiSpeed = 1.5; // Hızı biraz düşürdük
+const emojiSize = 40;
+
+const player = { x: canvas.width/2, y: canvas.height - 50, width: 50, height: 50 };
+
+// Emoji oluştur
+function spawnEmoji() {
+  const emoji = {
+    x: Math.random() * (canvas.width - emojiSize),
+    y: -emojiSize,
+    emoji: emojis[Math.floor(Math.random() * emojis.length)]
+  };
+  emojiObjects.push(emoji);
+}
+
+// Oyuncuyu çiz
+function drawPlayer() {
+  ctx.fillStyle = "blue";
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+}
+
+// Emojileri çiz
+function drawEmojis() {
+  ctx.font = `${emojiSize}px Arial`;
+  emojiObjects.forEach(e => ctx.fillText(e.emoji, e.x, e.y + emojiSize));
+}
+
+// Emojileri güncelle
+function updateEmojis() {
+  emojiObjects.forEach((e, index) => {
+    e.y += emojiSpeed;
+    // Çarpışma kontrolü
+    if (e.x < player.x + player.width && e.x + emojiSize > player.x &&
+        e.y < player.y + player.height && e.y + emojiSize > player.y) {
+      score += 5; // Puan 5
+      emojiObjects.splice(index, 1); // Yakalandığında sil
+      spawnEmoji();
+      updateLeaderboard();
+    } else if (e.y > canvas.height) {
+      emojiObjects.splice(index, 1);
+      spawnEmoji();
+    }
+  });
+}
+
+// Skoru çiz
+function drawScore() {
+  ctx.fillStyle = "black";
+  ctx.font = "20px Arial";
+  ctx.fillText(`${playerName}: ${score}`, 10, 30);
+}
+
+// Oyun döngüsü
+function gameLoop() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawPlayer();
+  drawEmojis();
+  drawScore();
+  updateEmojis();
+  requestAnimationFrame(gameLoop);
+}
+
+// Klavye ile hareket
+document.addEventListener('keydown', (e) => {
+  const step = 10;
+  if (e.key === 'ArrowLeft') player.x = Math.max(0, player.x - step);
+  if (e.key === 'ArrowRight') player.x = Math.min(canvas.width - player.width, player.x + step);
+});
+
+// Liderlik tablosunu güncelle
+function updateLeaderboard() {
+  const existing = leaderboard.find(p => p.name === playerName);
+  if (existing) {
+    if (score > existing.score) existing.score = score; // Sadece skoru güncelle
+  } else {
+    leaderboard.push({name: playerName, score: score});
+  }
+  leaderboard.sort((a,b) => b.score - a.score);
+  leaderboard = leaderboard.slice(0,5); // En yüksek 5
+  localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+
+  const listEl = document.getElementById('scoresList');
+  listEl.innerHTML = '';
+  leaderboard.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = `${item.name}: ${item.score}`;
+    listEl.appendChild(li);
+  });
+}
+
+// İlk emoji spawn
+for(let i=0;i<maxEmojis;i++) spawnEmoji();
+
+gameLoop();
+</script>
+
+</body>
+</html>
